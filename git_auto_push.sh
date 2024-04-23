@@ -13,52 +13,57 @@ if [ "$confirm_branch" != "y" ]; then
   exit 1
 fi
 
-# 检查是否有文件未跟踪
-if [ -n "$(git ls-files --others --exclude-standard)" ]; then
-  echo "存在未跟踪文件，请先添加或忽略文件"
-  # 将文件添加到暂存区
+# 检查是否有文件未跟踪或者有修改未提交
+if [ -n "$(git status --porcelain)" ]; then
+  echo "存在未提交或未跟踪文件，请先提交或添加文件"
+  # 添加文件到暂存区
   git add .  # 添加所有文件
-  # 选择commit类型
-  read -p "请选择commit类型（feat、fix、docs、style、refactor、test、chore,init）:" commit_type
+  # 选择commit类型, 显示commit类型的中文名称
+  read -p "请选择commit类型（feat、fix、docs、style、refactor、test、chore、init）:" commit_type
   # 提示输入commit信息
   read -p "请输入commit信息:" commit_message
   # 执行git commit命令提交代码
   git commit -m "$commit_type($current_branch): $commit_message"
+  exit 1
 fi
 
-# 检查当前分支是否有对应的远程分支
-remote_branch=$(git branch -r --contains $current_branch)
-if [ -z "$remote_branch" ]; then
-  # 推送当前分支并建立与远程上游的跟踪
-  git push --set-upstream origin $current_branch
-  echo "推送成功，建立与远程上游的跟踪"
-  # 提示是否推送当前分支
-  read -p "当前分支已存在远程分支，是否推送当前分支（y/n）:" push_branch
-  if [ "$push_branch" == "y" ]; then
-    # 执行git push命令上传代码到远程仓库
-    git push
-  fi
-else
-  # 检查当前分支是否落后于远程分支
-  git fetch
-  if [ -n "$(git log --oneline @{upstream}..$current_branch)" ]; then
-    # 提示是否拉取远程分支
-    read -p "当前分支落后于远程分支，是否拉取远程分支（y/n）:" pull_remote
-    if [ "$pull_remote" == "y" ]; then
-      # 执行git pull --rebase
-      git pull --rebase
-    fi
-  fi
-
-  # 检查是否存在冲突
-  if [ -n "$(git ls-files --unmerged)" ]; then
-    echo "存在冲突，请手工解决冲突并提交"
+# 检查是否有远程分支和当前分支建立联系
+if [ -n "$(git config --get-regexp '^branch\.[^.]*\.remote$')" ]; then
+  echo "存在远程分支，正在尝试推送代码"
+  # 合并远程分支到本地分支变基
+  git pull --rebase origin $current_branch
+  # 检查是否有冲突
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "存在冲突，请手动解决冲突后再次尝试推送代码"
     exit 1
-  else
-    # 执行git push命令上传代码到远程仓库
-    git push
   fi
+  # 提示执行推送操作
+  read -p "请确认是否要推送代码（y/n）:" confirm_push
+  if [ "$confirm_push" != "y" ]; then
+    echo "操作已取消"
+    exit 1
+  fi
+  # 执行推送操作
+  git push origin $current_branch
+  # 提示推送成功
+  echo "推送成功"
+  # 上传代码到远程仓库
+
+else
+  echo "当前分支没有远程分支，请先创建远程分支"
+  # 推送当前分支并建立与远程上游的跟踪关系
+  git push --set-upstream origin $current_branch
+  echo "建立远程跟踪关系成功"
+  # 提示执行推送操作
+  read -p "请确认是否要推送代码（y/n）:" confirm_push
+  if [ "$confirm_push" != "y" ]; then
+    echo "操作已取消"
+    exit 1
+  fi
+  # 上传代码到远程仓库
+  git push origin $current_branch
 fi
+
 
 
 
