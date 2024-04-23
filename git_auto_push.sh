@@ -24,7 +24,6 @@ if [ -n "$(git status --porcelain)" ]; then
   read -p "请输入commit信息:" commit_message
   # 执行git commit命令提交代码
   git commit -m "$commit_type($current_branch): $commit_message"
-  exit 1
 fi
 
 # 检查是否有远程分支和当前分支建立联系
