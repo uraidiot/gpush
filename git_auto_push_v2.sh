@@ -61,7 +61,7 @@ else
     echo "合并远程分支到本地分支变基失败"
     exit 1
   fi
-  if [ -n "$status" ]; then
+  if [ -n "$(git status --porcelain)" ]; then
     echo "存在冲突，请手动解决冲突后再次尝试推送代码"
     exit 1
   fi
