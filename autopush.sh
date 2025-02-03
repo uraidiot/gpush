@@ -1,18 +1,28 @@
 #!/bin/bash
-
-# 启用严格错误检查模式
 set -eo pipefail
 
-# 配置颜色输出
+# 颜色配置
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # 清除颜色
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# 初始化参数
+# 提交类型配置
+COMMIT_TYPES=(
+    "Feature: 新功能"
+    "Fix: BUG修复" 
+    "Docs: 文档更新"
+    "Style: 代码格式调整"
+    "Refactor: 代码重构"
+    "Test: 测试相关"
+    "Chore: 其他修改"
+)
+
+# 初始化变量
+COMMIT_TYPE=""
 COMMIT_MSG=""
-MAX_RETRY=3
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
 # 带颜色输出函数
@@ -21,156 +31,150 @@ warn_echo() { echo -e "${YELLOW}[警告] $1${NC}"; }
 info_echo() { echo -e "${BLUE}[信息] $1${NC}"; }
 success_echo() { echo -e "${GREEN}[成功] $1${NC}"; }
 
-# 帮助信息
-show_help() {
-    echo -e "使用方法:"
-    echo -e "  $0 [-m|--message] <提交信息>"
-    echo -e "  $0 -h|--help"
-    echo -e "\n选项:"
-    echo -e "  -m, --message   设置提交信息 (必须)"
-    echo -e "  -h, --help      显示帮助信息"
-    exit 0
+# 显示提交类型菜单
+show_commit_types() {
+    echo -e "\n${CYAN}请选择提交类型：${NC}"
+    for i in "${!COMMIT_TYPES[@]}"; do
+        echo -e "  ${CYAN}$(($i+1))) ${COMMIT_TYPES[$i]}${NC}"
+    done
+    echo -e "  ${CYAN}0) 跳过类型选择${NC}"
 }
 
-# 前置检查函数
+# 生成默认提交信息
+generate_default_msg() {
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[自动提交] $timestamp"
+}
+
+# 获取提交信息
+get_commit_message() {
+    while true; do
+        show_commit_types
+        read -p "请输入选择编号 (默认0): " type_choice
+        
+        type_choice=${type_choice:-0}
+
+        case $type_choice in
+            0) 
+                COMMIT_TYPE=""
+                break
+                ;;
+            [1-7])
+                index=$(($type_choice-1))
+                COMMIT_TYPE="${COMMIT_TYPES[$index]}"
+                break
+                ;;
+            *)
+                warn_echo "无效的选项，请重新输入"
+                ;;
+        esac
+    done
+
+    echo -e "\n${CYAN}请输入提交说明（直接回车使用自动生成）：${NC}"
+    read commit_msg
+
+    if [ -n "$commit_msg" ]; then
+        [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE - $commit_msg" || COMMIT_MSG="$commit_msg"
+    else
+        [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE $(generate_default_msg)" || COMMIT_MSG=$(generate_default_msg)
+    fi
+}
+
+# 增强版前置检查
 precheck() {
-    # 检查是否在git仓库
+    # 检查Git仓库
     if [ -z "$CURRENT_BRANCH" ]; then
         error_echo "当前目录不是Git仓库"
         exit 1
     fi
 
-    # 检查远程仓库配置
+    # 检查远程仓库
     if ! git remote get-url origin &>/dev/null; then
         error_echo "未配置远程仓库origin"
         exit 1
     fi
 
-    # 检查是否在主分支保护
+    # 保护分支确认（修复逻辑错误）
     if [[ "$CURRENT_BRANCH" =~ ^(main|master|develop)$ ]]; then
         warn_echo "你正在保护分支 $CURRENT_BRANCH 上操作"
         read -p "是否继续？(y/n) " -n 1 -r
         echo
-        [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            info_echo "操作已取消"
+            exit 0  # 修改为退出码0表示正常取消
+        else
+            info_echo "已确认在保护分支操作"
+            return  # 关键修复：确认后继续执行后续流程
+        fi
     fi
 }
 
-# 状态检测函数优化
+# 可靠的文件状态检测
 check_status() {
-    # 使用更可靠的状态检测方式
-    local changes=0
-    while IFS= read -r line; do
-        case "${line:0:2}" in
-            '??') ((untracked++)) ;;
-            ' M') ((modified++))  ;;
-            'D ') ((deleted++))   ;;
-            'A ') ((added++))     ;;
-            'R ') ((renamed++))   ;;
-            'C ') ((copied++))    ;;
-        esac
-        ((changes++))
-    done < <(git status --porcelain)
-
+    local changes=$(git status --porcelain | wc -l)
     if [ $changes -eq 0 ]; then
-        echo -e "${YELLOW}没有检测到文件变更${NC}"
-        exit 0
+        warn_echo "没有检测到文件变更"
+        return 1
+    else
+        echo -e "\n${CYAN}检测到以下文件变更：${NC}"
+        git status --short
+        return 0
     fi
-
-    # 显示详细变更信息
-    echo -e "${BLUE}检测到以下变更："
-    [ $untracked -gt 0 ] && echo -e "  ➕ 未跟踪文件: $untracked"
-    [ $modified -gt 0 ]  && echo -e "  ✏️ 修改文件: $modified"
-    [ $deleted -gt 0 ]   && echo -e "  ❌ 删除文件: $deleted"
-    [ $added -gt 0 ]     && echo -e "  ✅ 新增文件: $added"
-    [ $renamed -gt 0 ]   && echo -e "  🏷️ 重命名文件: $renamed"
-    [ $copied -gt 0 ]    && echo -e "  ⎘ 复制文件: $copied"
-    echo -e "${NC}"
 }
 
-# 增强版智能添加
-smart_add() {
-    # 处理特殊字符文件名
-    find . -path ./.git -prune -o -print0 | xargs -0 -I{} git add "{}" 2>/dev/null || {
-        # 处理添加失败的特殊文件
-        local retry_count=0
-        while [ $retry_count -lt 3 ]; do
-            echo -e "${YELLOW}正在尝试第 $((retry_count+1)) 次添加文件...${NC}"
-            git add -A >/dev/null 2>&1 && return 0
-            ((retry_count++))
-            sleep 1
-        done
-        echo -e "${RED}文件添加失败，以下文件可能需要手动处理：${NC}"
-        git status --porcelain | grep -E '^(\?\?|..)' | sed 's/^/  /'
+# 增强版提交流程
+safe_commit() {
+    git add -A || {
+        error_echo "文件添加失败"
+        exit 1
+    }
+    
+    git commit -m "$COMMIT_MSG" || {
+        error_echo "提交失败"
         exit 1
     }
 }
 
-# 生成提交信息
-generate_commit_message() {
-    date_str=$(date +"%Y-%m-%d %H:%M:%S")
-    echo "自动提交于 $date_str"
-}
-
-# 提交处理
-commit_changes() {
+# 带重试的推送
+retry_push() {
+    local max_retry=3
     local attempt=0
-    until [ $attempt -ge $MAX_RETRY ]; do
-        git commit -m "$COMMIT_MSG" && return 0
-        attempt=$((attempt+1))
-        warn_echo "提交失败，正在重试 (第 $attempt 次)..."
-        sleep 1
-    done
-    error_echo "提交失败，已达到最大重试次数"
-    exit 1
-}
-
-# 推送处理
-push_changes() {
-    local attempt=0
-    until [ $attempt -ge $MAX_RETRY ]; do
-        git pull --rebase origin "$CURRENT_BRANCH" && \
-        git push origin "$CURRENT_BRANCH" && return 0
+    
+    while [ $attempt -lt $max_retry ]; do
+        if git pull --rebase origin "$CURRENT_BRANCH" && \
+           git push origin "$CURRENT_BRANCH"; then
+            return 0
+        fi
         
         attempt=$((attempt+1))
-        warn_echo "推送失败，正在重试 (第 $attempt 次)..."
-        sleep $((attempt * 2))
+        warn_echo "操作失败，正在重试 ($attempt/$max_retry)..."
+        sleep 1
     done
     
-    error_echo "推送失败，请手动处理"
+    error_echo "操作失败，请手动处理"
     exit 1
 }
 
-# 主执行流程
 main() {
-    # 参数解析
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -m|--message)
-                COMMIT_MSG="$2"
-                shift 2
-                ;;
-            -h|--help)
-                show_help
-                ;;
-            *)
-                error_echo "未知参数: $1"
-                show_help
-                ;;
-        esac
-    done
-
-    [ -z "$COMMIT_MSG" ] && COMMIT_MSG=$(generate_commit_message)
-
     precheck
-    check_status || exit 0
-    smart_add
-    commit_changes
-    push_changes
+    
+    if ! check_status; then
+        exit 0
+    fi
 
-    success_echo "代码已成功提交并推送到 origin/$CURRENT_BRANCH"
-    git log -1 --pretty=format:"提交哈希: %C(yellow)%h%Creset | 时间: %C(cyan)%cd%Creset | 信息: %s"
+    get_commit_message
+
+    echo -e "\n${CYAN}即将提交以下信息：${NC}"
+    echo -e "  ${GREEN}$COMMIT_MSG${NC}"
+    read -p "确认提交？(y/n) " -n 1 -r
+    [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0
+
+    safe_commit
+    retry_push
+
+    success_echo "提交成功！最新提交记录："
+    git log -1 --pretty=format:"%C(yellow)%h%Creset | %C(cyan)%cd%Creset | %s" --date=format:"%Y-%m-%d %H:%M"
 }
 
-# 异常捕获
 trap 'error_echo "脚本异常终止"; exit 1' ERR
 main "$@"
