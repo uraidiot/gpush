@@ -1,8 +1,6 @@
 #!/bin/bash
-set -eo pipefail
-# 新增一条测试文本
-# 新增一条冲突测试文本-远程
-# 新增一条冲突测试文本-本地
+# set -eo pipefail
+# set -x
 
 # 颜色配置
 RED='\033[0;31m'
@@ -33,6 +31,24 @@ error_echo() { echo -e "${RED}[错误] $1${NC}"; }
 warn_echo() { echo -e "${YELLOW}[警告] $1${NC}"; }
 info_echo() { echo -e "${BLUE}[信息] $1${NC}"; }
 success_echo() { echo -e "${GREEN}[成功] $1${NC}"; }
+
+# 安全获取当前分支（兼容空仓库）
+get_current_branch() {
+    # 抑制错误并处理空值情况
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [ -z "$branch" ] || [ "$branch" == "HEAD" ]; then
+        echo ""
+    else
+        echo "$branch"
+    fi
+}
+
+# 检测未推送提交
+has_unpushed_commits() {
+    git fetch origin >/dev/null 2>&1
+    local unpushed=$(git rev-list @{u}..HEAD --count)
+    [ $unpushed -gt 0 ] && return 0 || return 1
+}
 
 # 显示提交类型菜单
 show_commit_types() {
@@ -85,47 +101,40 @@ get_commit_message() {
 
 # 增强版前置检查
 precheck() {
-    # 检查Git仓库
-    if [ -z "$CURRENT_BRANCH" ]; then
+    # 检查是否在git仓库
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         error_echo "当前目录不是Git仓库"
         exit 1
     fi
 
-    # 检查远程仓库
+    # 检查远程仓库配置
     if ! git remote get-url origin &>/dev/null; then
         error_echo "未配置远程仓库origin"
         exit 1
     fi
 
-    # 保护分支确认（修复逻辑错误）
+    # 处理空分支情况（新建仓库未提交）
+    if [ -z "$CURRENT_BRANCH" ]; then
+        warn_echo "当前处于初始状态，尚未创建任何分支"
+        return
+    fi
+
+    # 保护分支确认
     if [[ "$CURRENT_BRANCH" =~ ^(main|master|develop)$ ]]; then
         warn_echo "你正在保护分支 $CURRENT_BRANCH 上操作"
         read -p "是否继续？(y/n) " -n 1 -r
         echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            info_echo "操作已取消"
-            exit 0  # 修改为退出码0表示正常取消
-        else
-            info_echo "已确认在保护分支操作"
-            return  # 关键修复：确认后继续执行后续流程
-        fi
+        [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0
     fi
 }
 
-# 可靠的文件状态检测
+# 文件状态检测
 check_status() {
     local changes=$(git status --porcelain | wc -l)
-    if [ $changes -eq 0 ]; then
-        warn_echo "没有检测到文件变更"
-        return 1
-    else
-        echo -e "\n${CYAN}检测到以下文件变更：${NC}"
-        git status --short
-        return 0
-    fi
+    [ $changes -eq 0 ] && return 1 || return 0
 }
 
-# 增强版提交流程
+# 安全提交
 safe_commit() {
     git add -A || {
         error_echo "文件添加失败"
@@ -138,7 +147,7 @@ safe_commit() {
     }
 }
 
-# 带重试的推送
+# 带重试推送
 retry_push() {
     local max_retry=3
     local attempt=0
@@ -159,27 +168,46 @@ retry_push() {
 }
 
 main() {
+    echo '开始预检查...'
     precheck
-    
-    if ! check_status; then
-        exit 0
+
+    echo '开始处理未推送提交...'
+    # 处理未推送提交
+    if has_unpushed_commits; then
+        echo -e "${YELLOW}⚠️ 发现未推送的本地提交：${NC}"
+        git log @{u}..HEAD --oneline --color=always
+        read -p "是否立即推送这些提交？(y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            retry_push
+            success_echo "未推送提交已成功同步到远程仓库"
+        else
+            warn_echo "已跳过未推送提交"
+        fi
     fi
 
-    get_commit_message
+    echo '开始处理工作区变更...'
+    # 处理工作区变更
+    if check_status; then
+        echo -e "\n${CYAN}📦 检测到工作区文件变更：${NC}"
+        git status --short
 
-    echo -e "\n${CYAN}即将提交以下信息：${NC}"
-    echo -e "  ${GREEN}$COMMIT_MSG${NC}"
-    read -p "确认提交？(y/n) " -n 1 -r
-    [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0
+        get_commit_message
 
-    safe_commit
-    retry_push
+        echo -e "\n${CYAN}🚀 即将提交以下信息：${NC}"
+        echo -e "  ${GREEN}$COMMIT_MSG${NC}"
+        read -p "确认提交？(y/n) " -n 1 -r
+        [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0
 
-    success_echo "提交成功！最新提交记录："
-    git log -1 --pretty=format:"%C(yellow)%h%Creset | %C(cyan)%cd%Creset | %s" --date=format:"%Y-%m-%d %H:%M"
+        safe_commit
+        retry_push
+
+        success_echo "提交成功！最新提交记录：${GREEN}$COMMIT_MSG${NC}"
+        git log -1 --pretty=format:"%C(yellow)%h%Creset | %C(cyan)%cd%Creset | %s" --date=format:"%Y-%m-%d %H:%M"
+    else
+        warn_echo "没有需要提交的文件变更"
+    fi
 }
-
-# 测试提交前 gitpull
 
 trap 'error_echo "脚本异常终止"; exit 1' ERR
 main "$@"
