@@ -177,5 +177,7 @@ main() {
     git log -1 --pretty=format:"%C(yellow)%h%Creset | %C(cyan)%cd%Creset | %s" --date=format:"%Y-%m-%d %H:%M"
 }
 
+# 测试提交前 gitpull
+
 trap 'error_echo "脚本异常终止"; exit 1' ERR
 main "$@"
