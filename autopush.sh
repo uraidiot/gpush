@@ -1,5 +1,6 @@
 #!/bin/bash
 set -eo pipefail
+# 新增一条测试文本
 
 # 颜色配置
 RED='\033[0;31m'
