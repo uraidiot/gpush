@@ -130,20 +130,20 @@ get_commit_message() {
     
     # 如果通过命令行参数指定了提交类型
     if [ -n "$COMMIT_TYPE_NUM" ]; then
-        case $COMMIT_TYPE_NUM in
-            0) 
-                COMMIT_TYPE=""
-                ;;
-            [1-${#COMMIT_TYPES[@]}])
-                index=$(($COMMIT_TYPE_NUM-1))
-                # 提取类型名称（冒号前面的部分）
-                COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
-                ;;
-            *)
-                warn_echo "无效的类型编号: $COMMIT_TYPE_NUM"
-                COMMIT_TYPE=""
-                ;;
-        esac
+        # 检查是否为数字
+        if ! [[ "$COMMIT_TYPE_NUM" =~ ^[0-9]+$ ]]; then
+            warn_echo "无效的类型编号: $COMMIT_TYPE_NUM，必须是数字"
+            COMMIT_TYPE=""
+        elif [ "$COMMIT_TYPE_NUM" -eq 0 ]; then
+            COMMIT_TYPE=""
+        elif [ "$COMMIT_TYPE_NUM" -ge 1 ] && [ "$COMMIT_TYPE_NUM" -le "${#COMMIT_TYPES[@]}" ]; then
+            index=$(($COMMIT_TYPE_NUM-1))
+            # 提取类型名称（冒号前面的部分）
+            COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
+        else
+            warn_echo "无效的类型编号: $COMMIT_TYPE_NUM，范围应为 0-${#COMMIT_TYPES[@]}"
+            COMMIT_TYPE=""
+        fi
     else
         # 交互式选择提交类型
         while true; do
@@ -152,21 +152,21 @@ get_commit_message() {
             
             type_choice=${type_choice:-0}
 
-            case $type_choice in
-                0) 
-                    COMMIT_TYPE=""
-                    break
-                    ;;
-                [1-${#COMMIT_TYPES[@]}])
-                    index=$(($type_choice-1))
-                    # 提取类型名称（冒号前面的部分）
-                    COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
-                    break
-                    ;;
-                *)
-                    warn_echo "无效的选项，请重新输入"
-                    ;;
-            esac
+            # 检查是否为数字
+            if ! [[ "$type_choice" =~ ^[0-9]+$ ]]; then
+                warn_echo "无效的输入: $type_choice，必须是数字"
+                continue
+            elif [ "$type_choice" -eq 0 ]; then
+                COMMIT_TYPE=""
+                break
+            elif [ "$type_choice" -ge 1 ] && [ "$type_choice" -le "${#COMMIT_TYPES[@]}" ]; then
+                index=$(($type_choice-1))
+                # 提取类型名称（冒号前面的部分）
+                COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
+                break
+            else
+                warn_echo "无效的选项: $type_choice，范围应为 0-${#COMMIT_TYPES[@]}"
+            fi
         done
     fi
 
