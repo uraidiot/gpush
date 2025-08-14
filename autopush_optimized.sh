@@ -122,11 +122,6 @@ get_commit_message() {
         return
     fi
     
-    # 添加调试信息
-    info_echo "COMMIT_TYPES数组内容: ${COMMIT_TYPES[@]}"
-    info_echo "计算出的提交类型数量: $COMMIT_TYPES_COUNT"
-    info_echo "命令行指定的类型编号: $COMMIT_TYPE_NUM"
-
     # 如果通过命令行参数指定了提交类型
     if [ -n "$COMMIT_TYPE_NUM" ]; then
         # 检查是否为数字
