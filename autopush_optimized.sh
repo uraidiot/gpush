@@ -140,7 +140,8 @@ get_commit_message() {
                 ;;
             [1-${#COMMIT_TYPES[@]}])
                 index=$(($type_choice-1))
-                COMMIT_TYPE="${COMMIT_TYPES[$index]}"
+                # 提取类型名称（冒号前面的部分）
+                COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
                 break
                 ;;
             *)
@@ -150,7 +151,7 @@ get_commit_message() {
     done
 
     if [ "$SILENT_MODE" = true ]; then
-        [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE $(generate_default_msg)" || COMMIT_MSG=$(generate_default_msg)
+        [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE: $(generate_default_msg)" || COMMIT_MSG=$(generate_default_msg)
         return
     fi
 
@@ -158,10 +159,10 @@ get_commit_message() {
     read commit_msg
 
     if [ -n "$commit_msg" ]; then
-        [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE - $commit_msg" || COMMIT_MSG="$commit_msg"
-    else
-        [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE $(generate_default_msg)" || COMMIT_MSG=$(generate_default_msg)
-    fi
+            [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE: $commit_msg" || COMMIT_MSG="$commit_msg"
+        else
+            [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE: $(generate_default_msg)" || COMMIT_MSG=$(generate_default_msg)
+        fi
 }
 
 # 增强版前置检查
