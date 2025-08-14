@@ -34,6 +34,7 @@ COMMIT_MSG=""
 SILENT_MODE=false
 CACHE_ENABLED=true
 COMMIT_TYPE_NUM=""
+COMMIT_TYPES_COUNT=${#COMMIT_TYPES[@]}
 
 # 带颜色输出函数
 error_echo() { echo -e "${RED}[错误] $1${NC}"; }
@@ -136,12 +137,12 @@ get_commit_message() {
             COMMIT_TYPE=""
         elif [ "$COMMIT_TYPE_NUM" -eq 0 ]; then
             COMMIT_TYPE=""
-        elif [ "$COMMIT_TYPE_NUM" -ge 1 ] && [ "$COMMIT_TYPE_NUM" -le "${#COMMIT_TYPES[@]}" ]; then
+        elif [ "$COMMIT_TYPE_NUM" -ge 1 ] && [ "$COMMIT_TYPE_NUM" -le "$COMMIT_TYPES_COUNT" ]; then
             index=$(($COMMIT_TYPE_NUM-1))
             # 提取类型名称（冒号前面的部分）
             COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
         else
-            warn_echo "无效的类型编号: $COMMIT_TYPE_NUM，范围应为 0-${#COMMIT_TYPES[@]}"
+            warn_echo "无效的类型编号: $COMMIT_TYPE_NUM，范围应为 0-$COMMIT_TYPES_COUNT"
             COMMIT_TYPE=""
         fi
     else
@@ -159,13 +160,13 @@ get_commit_message() {
             elif [ "$type_choice" -eq 0 ]; then
                 COMMIT_TYPE=""
                 break
-            elif [ "$type_choice" -ge 1 ] && [ "$type_choice" -le "${#COMMIT_TYPES[@]}" ]; then
+            elif [ "$type_choice" -ge 1 ] && [ "$type_choice" -le "$COMMIT_TYPES_COUNT" ]; then
                 index=$(($type_choice-1))
                 # 提取类型名称（冒号前面的部分）
                 COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
                 break
             else
-                warn_echo "无效的选项: $type_choice，范围应为 0-${#COMMIT_TYPES[@]}"
+                warn_echo "无效的选项: $type_choice，范围应为 0-$COMMIT_TYPES_COUNT"
             fi
         done
     fi
