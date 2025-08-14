@@ -14,13 +14,7 @@ USER_CONFIG="$HOME/.gpush/config.sh"
 : ${MAX_RETRY:=3}
 : ${PROTECTED_BRANCHES:=(main master develop)}
 : ${COMMIT_TYPES:=(
-    "Feature: 新功能"
-    "Fix: BUG修复"
-    "Docs: 文档更新"
-    "Style: 代码格式调整"
-    "Refactor: 代码重构"
-    "Test: 测试相关"
-    "Chore: 其他修改"
+
 )}
 : ${CACHE_DIR:="$HOME/.gpush/cache"}
 : ${CACHE_TTL:=300}  # 缓存有效期(秒)
