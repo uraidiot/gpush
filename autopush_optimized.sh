@@ -8,7 +8,7 @@ CONFIG_FILE="$HOME/.gpush/config.sh"
 # 默认配置
 : ${MAX_RETRY:=3}
 : ${PROTECTED_BRANCHES:=(main master develop)}
-: ${COMMIT_TYPES:=("Feature: 新功能" "Fix: BUG修复" "Docs: 文档更新" "Style: 代码格式调整" "Refactor: 代码重构" "Test: 测试相关" "Chore: 其他修改")}
+COMMIT_TYPES=("Feature: 新功能" "Fix: BUG修复" "Docs: 文档更新" "Style: 代码格式调整" "Refactor: 代码重构" "Test: 测试相关" "Chore: 其他修改")
 : ${CACHE_DIR:="$HOME/.gpush/cache"}
 : ${CACHE_TTL:=300}  # 缓存有效期(秒)
 
@@ -26,11 +26,8 @@ COMMIT_MSG=""
 SILENT_MODE=false
 CACHE_ENABLED=true
 COMMIT_TYPE_NUM=""
-# 计算提交类型数量
-COMMIT_TYPES_COUNT=0
-for i in "${COMMIT_TYPES[@]}"; do
-    COMMIT_TYPES_COUNT=$((COMMIT_TYPES_COUNT+1))
-done
+# 直接使用数组长度
+COMMIT_TYPES_COUNT=${#COMMIT_TYPES[@]}
 
 # 带颜色输出函数
 error_echo() { echo -e "${RED}[错误] $1${NC}"; }
