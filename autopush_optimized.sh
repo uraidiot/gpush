@@ -2,13 +2,26 @@
 
 # optimized by Trea
 # 配置文件加载
-CONFIG_FILE="$HOME/.gpush/config.sh"
-[ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
+# 首先尝试加载工作区中的config.sh
+WORKSPACE_CONFIG="$(dirname "$0")/config.sh"
+[ -f "$WORKSPACE_CONFIG" ] && source "$WORKSPACE_CONFIG"
+
+# 然后尝试加载用户主目录下的配置文件
+USER_CONFIG="$HOME/.gpush/config.sh"
+[ -f "$USER_CONFIG" ] && source "$USER_CONFIG"
 
 # 默认配置
 : ${MAX_RETRY:=3}
 : ${PROTECTED_BRANCHES:=(main master develop)}
-COMMIT_TYPES=("Feature: 新功能" "Fix: BUG修复" "Docs: 文档更新" "Style: 代码格式调整" "Refactor: 代码重构" "Test: 测试相关" "Chore: 其他修改")
+: ${COMMIT_TYPES:=(
+    "Feature: 新功能"
+    "Fix: BUG修复"
+    "Docs: 文档更新"
+    "Style: 代码格式调整"
+    "Refactor: 代码重构"
+    "Test: 测试相关"
+    "Chore: 其他修改"
+)}
 : ${CACHE_DIR:="$HOME/.gpush/cache"}
 : ${CACHE_TTL:=300}  # 缓存有效期(秒)
 
