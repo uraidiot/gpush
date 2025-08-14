@@ -34,7 +34,11 @@ COMMIT_MSG=""
 SILENT_MODE=false
 CACHE_ENABLED=true
 COMMIT_TYPE_NUM=""
-COMMIT_TYPES_COUNT=${#COMMIT_TYPES[@]}
+# 计算提交类型数量
+COMMIT_TYPES_COUNT=0
+for i in "${COMMIT_TYPES[@]}"; do
+    COMMIT_TYPES_COUNT=$((COMMIT_TYPES_COUNT+1))
+done
 
 # 带颜色输出函数
 error_echo() { echo -e "${RED}[错误] $1${NC}"; }
