@@ -33,6 +33,7 @@ COMMIT_TYPE=""
 COMMIT_MSG=""
 SILENT_MODE=false
 CACHE_ENABLED=true
+COMMIT_TYPE_NUM=""
 
 # 带颜色输出函数
 error_echo() { echo -e "${RED}[错误] $1${NC}"; }
@@ -127,28 +128,47 @@ get_commit_message() {
         return
     fi
     
-    while true; do
-        show_commit_types
-        read -p "请输入选择编号 (默认0): " type_choice
-        
-        type_choice=${type_choice:-0}
-
-        case $type_choice in
+    # 如果通过命令行参数指定了提交类型
+    if [ -n "$COMMIT_TYPE_NUM" ]; then
+        case $COMMIT_TYPE_NUM in
             0) 
                 COMMIT_TYPE=""
-                break
                 ;;
             [1-${#COMMIT_TYPES[@]}])
-                index=$(($type_choice-1))
+                index=$(($COMMIT_TYPE_NUM-1))
                 # 提取类型名称（冒号前面的部分）
                 COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
-                break
                 ;;
             *)
-                warn_echo "无效的选项，请重新输入"
+                warn_echo "无效的类型编号: $COMMIT_TYPE_NUM"
+                COMMIT_TYPE=""
                 ;;
         esac
-    done
+    else
+        # 交互式选择提交类型
+        while true; do
+            show_commit_types
+            read -p "请输入选择编号 (默认0): " type_choice
+            
+            type_choice=${type_choice:-0}
+
+            case $type_choice in
+                0) 
+                    COMMIT_TYPE=""
+                    break
+                    ;;
+                [1-${#COMMIT_TYPES[@]}])
+                    index=$(($type_choice-1))
+                    # 提取类型名称（冒号前面的部分）
+                    COMMIT_TYPE="${COMMIT_TYPES[$index]%%:*}"
+                    break
+                    ;;
+                *)
+                    warn_echo "无效的选项，请重新输入"
+                    ;;
+            esac
+        done
+    fi
 
     if [ "$SILENT_MODE" = true ]; then
         [ -n "$COMMIT_TYPE" ] && COMMIT_MSG="$COMMIT_TYPE: $(generate_default_msg)" || COMMIT_MSG=$(generate_default_msg)
@@ -270,6 +290,10 @@ parse_args() {
                 ;;
             -m|--message) 
                 COMMIT_MSG="$2"
+                shift 2 
+                ;;
+            -t|--type) 
+                COMMIT_TYPE_NUM="$2"
                 shift 2 
                 ;;
             --no-cache) 
