@@ -35,10 +35,14 @@ SILENT_MODE=false
 CACHE_ENABLED=true
 COMMIT_TYPE_NUM=""
 # 计算提交类型数量
+# 添加调试信息
+info_echo "COMMIT_TYPES数组内容: ${COMMIT_TYPES[@]}"
 COMMIT_TYPES_COUNT=0
 for i in "${COMMIT_TYPES[@]}"; do
+    info_echo "当前元素: $i"
     COMMIT_TYPES_COUNT=$((COMMIT_TYPES_COUNT+1))
 done
+info_echo "计算出的提交类型数量: $COMMIT_TYPES_COUNT"
 
 # 带颜色输出函数
 error_echo() { echo -e "${RED}[错误] $1${NC}"; }
